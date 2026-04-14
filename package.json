@@ -1,0 +1,26 @@
+{
+  "name": "arkime-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Arkime full packet capture — session search, network investigation, and capture health",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "arkime-mcp-server": "build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node build/index.js"
+  },
+  "keywords": ["mcp", "arkime", "pcap", "network"],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.24.3",
+    "digest-fetch": "^3.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  }
+}
