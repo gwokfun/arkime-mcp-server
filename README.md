@@ -1,5 +1,7 @@
 # arkime-mcp-server
 
+English | [中文](README_zh.md)
+
 An [MCP](https://modelcontextprotocol.io) server for [Arkime](https://arkime.com) full packet capture. Lets AI assistants search network sessions, investigate traffic patterns, and monitor capture health.
 
 Built with Python 3 and [FastMCP](https://github.com/jlowin/fastmcp).
