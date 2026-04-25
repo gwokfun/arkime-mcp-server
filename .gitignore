@@ -1,7 +1,3 @@
-node_modules/
-build/
-*.tsbuildinfo
-
 # Python
 __pycache__/
 *.py[cod]
