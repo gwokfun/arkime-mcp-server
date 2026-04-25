@@ -162,7 +162,7 @@ The server uses stdio transport and follows the MCP protocol specification. It c
 
 ## Authentication
 
-Arkime uses HTTP Digest authentication. The server handles this automatically using the provided credentials via the `httpx-auth` library.
+Arkime uses HTTP Digest authentication. The server includes a custom implementation of HTTP Digest authentication using httpx's authentication flow system.
 
 ## Development
 

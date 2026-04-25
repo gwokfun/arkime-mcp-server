@@ -2,10 +2,100 @@
 Arkime viewer API client with HTTP Digest authentication.
 """
 
+import hashlib
 import httpx
-from httpx_auth import HTTPDigestAuth
 from typing import Any, Dict, Optional, Union
 from urllib.parse import urljoin
+import re
+
+
+class DigestAuth(httpx.Auth):
+    """HTTP Digest Authentication handler for httpx."""
+
+    def __init__(self, username: str, password: str):
+        self.username = username
+        self.password = password
+        self._challenge = None
+
+    def auth_flow(self, request):
+        # First, try the request without auth to get the challenge
+        response = yield request
+
+        if response.status_code == 401:
+            # Parse the WWW-Authenticate header
+            auth_header = response.headers.get("www-authenticate", "")
+            if "Digest" in auth_header:
+                self._challenge = self._parse_challenge(auth_header)
+
+                # Build the Authorization header
+                auth = self._build_digest_header(request.method, str(request.url.path))
+                request.headers["Authorization"] = auth
+
+                # Retry the request with auth
+                yield request
+
+    def _parse_challenge(self, header: str) -> Dict[str, str]:
+        """Parse the WWW-Authenticate Digest challenge."""
+        challenge = {}
+        # Remove 'Digest ' prefix
+        header = header.replace("Digest ", "")
+
+        # Parse key=value pairs
+        for match in re.finditer(r'(\w+)=(?:"([^"]+)"|([^,\s]+))', header):
+            key = match.group(1)
+            value = match.group(2) or match.group(3)
+            challenge[key] = value
+
+        return challenge
+
+    def _build_digest_header(self, method: str, uri: str) -> str:
+        """Build the Authorization header for Digest authentication."""
+        realm = self._challenge.get("realm", "")
+        nonce = self._challenge.get("nonce", "")
+        qop = self._challenge.get("qop", "")
+        algorithm = self._challenge.get("algorithm", "MD5")
+        opaque = self._challenge.get("opaque", "")
+
+        # Calculate HA1
+        ha1 = hashlib.md5(f"{self.username}:{realm}:{self.password}".encode()).hexdigest()
+
+        # Calculate HA2
+        ha2 = hashlib.md5(f"{method}:{uri}".encode()).hexdigest()
+
+        # Calculate response
+        if qop:
+            nc = "00000001"
+            cnonce = hashlib.md5(b"client_nonce").hexdigest()[:8]
+            response_hash = hashlib.md5(
+                f"{ha1}:{nonce}:{nc}:{cnonce}:{qop}:{ha2}".encode()
+            ).hexdigest()
+
+            auth_header = (
+                f'Digest username="{self.username}", '
+                f'realm="{realm}", '
+                f'nonce="{nonce}", '
+                f'uri="{uri}", '
+                f'qop={qop}, '
+                f'nc={nc}, '
+                f'cnonce="{cnonce}", '
+                f'response="{response_hash}", '
+                f'algorithm={algorithm}'
+            )
+        else:
+            response_hash = hashlib.md5(f"{ha1}:{nonce}:{ha2}".encode()).hexdigest()
+            auth_header = (
+                f'Digest username="{self.username}", '
+                f'realm="{realm}", '
+                f'nonce="{nonce}", '
+                f'uri="{uri}", '
+                f'response="{response_hash}", '
+                f'algorithm={algorithm}'
+            )
+
+        if opaque:
+            auth_header += f', opaque="{opaque}"'
+
+        return auth_header
 
 
 class ArkimeClient:
@@ -21,7 +111,7 @@ class ArkimeClient:
             password: Password for authentication
         """
         self.base_url = base_url.rstrip("/")
-        self.auth = HTTPDigestAuth(username, password)
+        self.auth = DigestAuth(username, password)
         self.client = httpx.Client(auth=self.auth, timeout=30.0)
 
     def __enter__(self):

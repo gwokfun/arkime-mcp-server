@@ -14,21 +14,39 @@ from .client import ArkimeClient
 from .config import Config
 from .utils import format_bytes, format_timestamp, protocol_name, summarize_session
 
-# Initialize configuration
-try:
-    config = Config()
-except ValueError as e:
-    print(f"Configuration error: {e}", file=sys.stderr)
-    sys.exit(1)
+# Global variables for lazy initialization
+_config = None
+_client = None
+_mcp = None
 
-# Initialize MCP server
-mcp = FastMCP(
-    "arkime",
-    dependencies=["httpx", "httpx-auth", "pyyaml", "python-dotenv"],
-)
 
-# Initialize Arkime client
-client = ArkimeClient(config.arkime_url, config.arkime_user, config.arkime_password)
+def get_config():
+    """Get or initialize configuration."""
+    global _config
+    if _config is None:
+        try:
+            _config = Config()
+        except ValueError as e:
+            print(f"Configuration error: {e}", file=sys.stderr)
+            sys.exit(1)
+    return _config
+
+
+def get_client():
+    """Get or initialize Arkime client."""
+    global _client
+    if _client is None:
+        config = get_config()
+        _client = ArkimeClient(config.arkime_url, config.arkime_user, config.arkime_password)
+    return _client
+
+
+def get_mcp():
+    """Get or initialize MCP server."""
+    global _mcp
+    if _mcp is None:
+        _mcp = FastMCP("arkime")
+    return _mcp
 
 
 # ── Helper function for tool registration ──
@@ -38,7 +56,7 @@ def tool_enabled(tool_name: str):
     """Decorator to conditionally register tools based on configuration."""
 
     def decorator(func):
-        if config.is_tool_enabled(tool_name):
+        if get_config().is_tool_enabled(tool_name):
             return func
         return None
 
@@ -48,7 +66,7 @@ def tool_enabled(tool_name: str):
 # ── Session Search & Analysis Tools ──
 
 
-@mcp.tool()
+@get_mcp().tool()
 def search_sessions(
     expression: Optional[str] = None,
     hours: int = 1,
@@ -67,11 +85,11 @@ def search_sessions(
     Returns:
         JSON string with session search results including IPs, ports, protocols, bytes, geo, and AS info
     """
-    if not config.is_tool_enabled("search_sessions"):
+    if not get_config().is_tool_enabled("search_sessions"):
         return json.dumps({"error": "Tool is disabled"})
 
     length = max(1, min(limit, 200))
-    result = client.get_sessions(
+    result = get_client().get_sessions(
         expression=expression, date=hours, length=length, order=order
     )
 
@@ -87,7 +105,7 @@ def search_sessions(
     )
 
 
-@mcp.tool()
+@get_mcp().tool()
 def get_session_detail(node: str, session_id: str) -> str:
     """
     Get full detail for a single session.
@@ -99,14 +117,14 @@ def get_session_detail(node: str, session_id: str) -> str:
     Returns:
         JSON string with full decoded protocol information for the session
     """
-    if not config.is_tool_enabled("get_session_detail"):
+    if not get_config().is_tool_enabled("get_session_detail"):
         return json.dumps({"error": "Tool is disabled"})
 
-    detail = client.get_session_detail(node, session_id)
+    detail = get_client().get_session_detail(node, session_id)
     return json.dumps(detail, indent=2) if isinstance(detail, dict) else str(detail)
 
 
-@mcp.tool()
+@get_mcp().tool()
 def get_session_packets(node: str, session_id: str) -> str:
     """
     Get decoded packet data for a session.
@@ -118,14 +136,14 @@ def get_session_packets(node: str, session_id: str) -> str:
     Returns:
         JSON string with decoded packet contents
     """
-    if not config.is_tool_enabled("get_session_packets"):
+    if not get_config().is_tool_enabled("get_session_packets"):
         return json.dumps({"error": "Tool is disabled"})
 
-    packets = client.get_session_packets(node, session_id)
+    packets = get_client().get_session_packets(node, session_id)
     return json.dumps(packets, indent=2) if isinstance(packets, dict) else str(packets)
 
 
-@mcp.tool()
+@get_mcp().tool()
 def get_session_raw(node: str, session_id: str) -> str:
     """
     Get raw session data.
@@ -137,16 +155,16 @@ def get_session_raw(node: str, session_id: str) -> str:
     Returns:
         Raw session data as string
     """
-    if not config.is_tool_enabled("get_session_raw"):
+    if not get_config().is_tool_enabled("get_session_raw"):
         return "Tool is disabled"
 
-    return str(client.get_session_raw(node, session_id))
+    return str(get_client().get_session_raw(node, session_id))
 
 
 # ── Network Investigation Tools ──
 
 
-@mcp.tool()
+@get_mcp().tool()
 def top_talkers(
     field: str = "source.ip",
     expression: Optional[str] = None,
@@ -168,13 +186,13 @@ def top_talkers(
     Returns:
         Newline-separated list of top values with session counts
     """
-    if not config.is_tool_enabled("top_talkers"):
+    if not get_config().is_tool_enabled("top_talkers"):
         return "Tool is disabled"
 
-    return str(client.get_unique(exp=field, expression=expression, date=hours, length=limit))
+    return str(get_client().get_unique(exp=field, expression=expression, date=hours, length=limit))
 
 
-@mcp.tool()
+@get_mcp().tool()
 def connections_graph(
     expression: Optional[str] = None,
     hours: int = 1,
@@ -195,10 +213,10 @@ def connections_graph(
     Returns:
         JSON string with nodes and links between sources and destinations with byte/packet/session counts
     """
-    if not config.is_tool_enabled("connections_graph"):
+    if not get_config().is_tool_enabled("connections_graph"):
         return json.dumps({"error": "Tool is disabled"})
 
-    result = client.get_connections(
+    result = get_client().get_connections(
         expression=expression,
         date=hours,
         src_field=src_field,
@@ -236,7 +254,7 @@ def connections_graph(
     return json.dumps({"nodes": nodes, "links": links}, indent=2)
 
 
-@mcp.tool()
+@get_mcp().tool()
 def unique_destinations(source_ip: str, hours: int = 1, limit: int = 50) -> str:
     """
     List distinct external destination IPs contacted by an internal host.
@@ -251,7 +269,7 @@ def unique_destinations(source_ip: str, hours: int = 1, limit: int = 50) -> str:
     Returns:
         Newline-separated list of external IPs contacted
     """
-    if not config.is_tool_enabled("unique_destinations"):
+    if not get_config().is_tool_enabled("unique_destinations"):
         return "Tool is disabled"
 
     expr = (
@@ -259,11 +277,11 @@ def unique_destinations(source_ip: str, hours: int = 1, limit: int = 50) -> str:
         f"ip.dst!=192.168.0.0/16 && ip.dst!=172.16.0.0/12"
     )
     return str(
-        client.get_unique(exp="destination.ip", expression=expr, date=hours, length=limit)
+        get_client().get_unique(exp="destination.ip", expression=expr, date=hours, length=limit)
     )
 
 
-@mcp.tool()
+@get_mcp().tool()
 def dns_lookups(
     domain: Optional[str] = None,
     source_ip: Optional[str] = None,
@@ -284,7 +302,7 @@ def dns_lookups(
     Returns:
         Newline-separated list of DNS queries with counts
     """
-    if not config.is_tool_enabled("dns_lookups"):
+    if not get_config().is_tool_enabled("dns_lookups"):
         return "Tool is disabled"
 
     parts = []
@@ -294,10 +312,10 @@ def dns_lookups(
         parts.append(f"ip.src=={source_ip}")
 
     expr = " && ".join(parts) if parts else None
-    return str(client.get_unique(exp="host.dns", expression=expr, date=hours, length=limit))
+    return str(get_client().get_unique(exp="host.dns", expression=expr, date=hours, length=limit))
 
 
-@mcp.tool()
+@get_mcp().tool()
 def reverse_dns(ip: str) -> str:
     """
     Get PTR/reverse DNS records for an IP address.
@@ -308,17 +326,17 @@ def reverse_dns(ip: str) -> str:
     Returns:
         JSON string with reverse DNS information
     """
-    if not config.is_tool_enabled("reverse_dns"):
+    if not get_config().is_tool_enabled("reverse_dns"):
         return json.dumps({"error": "Tool is disabled"})
 
-    result = client.get_reverse_dns(ip)
+    result = get_client().get_reverse_dns(ip)
     return json.dumps(result, indent=2) if isinstance(result, dict) else str(result)
 
 
 # ── Security & Anomaly Tools ──
 
 
-@mcp.tool()
+@get_mcp().tool()
 def external_connections(
     source_ip: Optional[str] = None, hours: int = 1, limit: int = 50
 ) -> str:
@@ -335,7 +353,7 @@ def external_connections(
     Returns:
         JSON string with external connections sorted by bytes
     """
-    if not config.is_tool_enabled("external_connections"):
+    if not get_config().is_tool_enabled("external_connections"):
         return json.dumps({"error": "Tool is disabled"})
 
     parts = [
@@ -349,7 +367,7 @@ def external_connections(
         parts.append(f"ip.src=={source_ip}")
 
     expr = " && ".join(parts)
-    result = client.get_sessions(
+    result = get_client().get_sessions(
         expression=expr, date=hours, length=limit, order="totDataBytes:desc"
     )
 
@@ -365,7 +383,7 @@ def external_connections(
     )
 
 
-@mcp.tool()
+@get_mcp().tool()
 def geo_summary(expression: Optional[str] = None, hours: int = 1, limit: int = 30) -> str:
     """
     Breakdown of destination traffic by country.
@@ -380,11 +398,11 @@ def geo_summary(expression: Optional[str] = None, hours: int = 1, limit: int = 3
     Returns:
         Newline-separated list of countries with session counts
     """
-    if not config.is_tool_enabled("geo_summary"):
+    if not get_config().is_tool_enabled("geo_summary"):
         return "Tool is disabled"
 
     return str(
-        client.get_unique(
+        get_client().get_unique(
             exp="destination.geo.country_iso_code",
             expression=expression,
             date=hours,
@@ -396,7 +414,7 @@ def geo_summary(expression: Optional[str] = None, hours: int = 1, limit: int = 3
 # ── System Health & Info Tools ──
 
 
-@mcp.tool()
+@get_mcp().tool()
 def capture_status() -> str:
     """
     Get current Arkime capture health.
@@ -404,10 +422,10 @@ def capture_status() -> str:
     Returns:
         JSON string with cluster status, node count, shard health, and OpenSearch version
     """
-    if not config.is_tool_enabled("capture_status"):
+    if not get_config().is_tool_enabled("capture_status"):
         return json.dumps({"error": "Tool is disabled"})
 
-    health = client.get_es_health()
+    health = get_client().get_es_health()
     return json.dumps(
         {
             "cluster": health.get("cluster_name"),
@@ -422,7 +440,7 @@ def capture_status() -> str:
     )
 
 
-@mcp.tool()
+@get_mcp().tool()
 def pcap_files(limit: int = 20) -> str:
     """
     List PCAP capture files with sizes, packet counts, and time ranges.
@@ -433,10 +451,10 @@ def pcap_files(limit: int = 20) -> str:
     Returns:
         JSON string with PCAP file information
     """
-    if not config.is_tool_enabled("pcap_files"):
+    if not get_config().is_tool_enabled("pcap_files"):
         return json.dumps({"error": "Tool is disabled"})
 
-    result = client.get_files(length=limit)
+    result = get_client().get_files(length=limit)
     files = [
         {
             "name": str(f.get("name", "")).split("/")[-1],
@@ -453,7 +471,7 @@ def pcap_files(limit: int = 20) -> str:
     return json.dumps({"total_files": result.get("recordsTotal", 0), "files": files}, indent=2)
 
 
-@mcp.tool()
+@get_mcp().tool()
 def list_fields(group: Optional[str] = None) -> str:
     """
     List available Arkime session fields for use in search expressions.
@@ -464,10 +482,10 @@ def list_fields(group: Optional[str] = None) -> str:
     Returns:
         JSON string with available fields and their metadata
     """
-    if not config.is_tool_enabled("list_fields"):
+    if not get_config().is_tool_enabled("list_fields"):
         return json.dumps({"error": "Tool is disabled"})
 
-    fields = client.get_fields()
+    fields = get_client().get_fields()
     filtered = [
         {
             "expression": f.get("exp"),
@@ -482,7 +500,7 @@ def list_fields(group: Optional[str] = None) -> str:
     return json.dumps(filtered, indent=2)
 
 
-@mcp.tool()
+@get_mcp().tool()
 def get_field_values(field: str, expression: Optional[str] = None) -> str:
     """
     Get possible values for a specific field.
@@ -494,17 +512,17 @@ def get_field_values(field: str, expression: Optional[str] = None) -> str:
     Returns:
         JSON string with possible field values
     """
-    if not config.is_tool_enabled("get_field_values"):
+    if not get_config().is_tool_enabled("get_field_values"):
         return json.dumps({"error": "Tool is disabled"})
 
-    values = client.get_field_values(field, expression)
+    values = get_client().get_field_values(field, expression)
     return json.dumps(values, indent=2)
 
 
 # ── User & Settings Tools ──
 
 
-@mcp.tool()
+@get_mcp().tool()
 def get_current_user() -> str:
     """
     Get information about the current authenticated user.
@@ -512,14 +530,14 @@ def get_current_user() -> str:
     Returns:
         JSON string with user information
     """
-    if not config.is_tool_enabled("get_current_user"):
+    if not get_config().is_tool_enabled("get_current_user"):
         return json.dumps({"error": "Tool is disabled"})
 
-    user = client.get_current_user()
+    user = get_client().get_current_user()
     return json.dumps(user, indent=2)
 
 
-@mcp.tool()
+@get_mcp().tool()
 def get_settings() -> str:
     """
     Get Arkime viewer settings.
@@ -527,17 +545,17 @@ def get_settings() -> str:
     Returns:
         JSON string with viewer settings
     """
-    if not config.is_tool_enabled("get_settings"):
+    if not get_config().is_tool_enabled("get_settings"):
         return json.dumps({"error": "Tool is disabled"})
 
-    settings = client.get_settings()
+    settings = get_client().get_settings()
     return json.dumps(settings, indent=2)
 
 
 # ── Tags & Annotations Tools ──
 
 
-@mcp.tool()
+@get_mcp().tool()
 def add_tags(tags: str, node: str, session_id: str, segments: str = "all") -> str:
     """
     Add tags to a session.
@@ -551,14 +569,14 @@ def add_tags(tags: str, node: str, session_id: str, segments: str = "all") -> st
     Returns:
         JSON string with success message
     """
-    if not config.is_tool_enabled("add_tags"):
+    if not get_config().is_tool_enabled("add_tags"):
         return json.dumps({"error": "Tool is disabled"})
 
     result = client.add_tags(tags, node, session_id, segments)
     return json.dumps(result, indent=2)
 
 
-@mcp.tool()
+@get_mcp().tool()
 def remove_tags(tags: str, node: str, session_id: str, segments: str = "all") -> str:
     """
     Remove tags from a session.
@@ -572,7 +590,7 @@ def remove_tags(tags: str, node: str, session_id: str, segments: str = "all") ->
     Returns:
         JSON string with success message
     """
-    if not config.is_tool_enabled("remove_tags"):
+    if not get_config().is_tool_enabled("remove_tags"):
         return json.dumps({"error": "Tool is disabled"})
 
     result = client.remove_tags(tags, node, session_id, segments)
@@ -582,7 +600,7 @@ def remove_tags(tags: str, node: str, session_id: str, segments: str = "all") ->
 # ── Statistics Tools ──
 
 
-@mcp.tool()
+@get_mcp().tool()
 def get_stats() -> str:
     """
     Get Arkime statistics.
@@ -590,14 +608,14 @@ def get_stats() -> str:
     Returns:
         JSON string with Arkime statistics
     """
-    if not config.is_tool_enabled("get_stats"):
+    if not get_config().is_tool_enabled("get_stats"):
         return json.dumps({"error": "Tool is disabled"})
 
-    stats = client.get_stats()
+    stats = get_client().get_stats()
     return json.dumps(stats, indent=2)
 
 
-@mcp.tool()
+@get_mcp().tool()
 def get_es_stats() -> str:
     """
     Get Elasticsearch/OpenSearch indices statistics.
@@ -605,17 +623,17 @@ def get_es_stats() -> str:
     Returns:
         JSON string with index statistics
     """
-    if not config.is_tool_enabled("get_es_stats"):
+    if not get_config().is_tool_enabled("get_es_stats"):
         return json.dumps({"error": "Tool is disabled"})
 
-    stats = client.get_es_indices()
+    stats = get_client().get_es_indices()
     return json.dumps(stats, indent=2)
 
 
 # ── Hunt Tools ──
 
 
-@mcp.tool()
+@get_mcp().tool()
 def create_hunt(
     name: str,
     search: str,
@@ -636,14 +654,14 @@ def create_hunt(
     Returns:
         JSON string with hunt creation result
     """
-    if not config.is_tool_enabled("create_hunt"):
+    if not get_config().is_tool_enabled("create_hunt"):
         return json.dumps({"error": "Tool is disabled"})
 
     result = client.create_hunt(name, search, hunt_type, src, dst)
     return json.dumps(result, indent=2)
 
 
-@mcp.tool()
+@get_mcp().tool()
 def get_hunts() -> str:
     """
     Get list of hunt jobs.
@@ -651,14 +669,14 @@ def get_hunts() -> str:
     Returns:
         JSON string with list of hunts
     """
-    if not config.is_tool_enabled("get_hunts"):
+    if not get_config().is_tool_enabled("get_hunts"):
         return json.dumps({"error": "Tool is disabled"})
 
-    hunts = client.get_hunts()
+    hunts = get_client().get_hunts()
     return json.dumps(hunts, indent=2)
 
 
-@mcp.tool()
+@get_mcp().tool()
 def delete_hunt(hunt_id: str) -> str:
     """
     Delete a hunt job.
@@ -669,7 +687,7 @@ def delete_hunt(hunt_id: str) -> str:
     Returns:
         JSON string with deletion result
     """
-    if not config.is_tool_enabled("delete_hunt"):
+    if not get_config().is_tool_enabled("delete_hunt"):
         return json.dumps({"error": "Tool is disabled"})
 
     result = client.delete_hunt(hunt_id)
@@ -679,7 +697,7 @@ def delete_hunt(hunt_id: str) -> str:
 # ── View Tools ──
 
 
-@mcp.tool()
+@get_mcp().tool()
 def create_view(name: str, expression: str) -> str:
     """
     Create a saved view (search query).
@@ -691,14 +709,14 @@ def create_view(name: str, expression: str) -> str:
     Returns:
         JSON string with view creation result
     """
-    if not config.is_tool_enabled("create_view"):
+    if not get_config().is_tool_enabled("create_view"):
         return json.dumps({"error": "Tool is disabled"})
 
     result = client.create_view(name, expression)
     return json.dumps(result, indent=2)
 
 
-@mcp.tool()
+@get_mcp().tool()
 def get_views() -> str:
     """
     Get list of saved views.
@@ -706,14 +724,14 @@ def get_views() -> str:
     Returns:
         JSON string with list of views
     """
-    if not config.is_tool_enabled("get_views"):
+    if not get_config().is_tool_enabled("get_views"):
         return json.dumps({"error": "Tool is disabled"})
 
-    views = client.get_views()
+    views = get_client().get_views()
     return json.dumps(views, indent=2)
 
 
-@mcp.tool()
+@get_mcp().tool()
 def delete_view(view_id: str) -> str:
     """
     Delete a saved view.
@@ -724,7 +742,7 @@ def delete_view(view_id: str) -> str:
     Returns:
         JSON string with deletion result
     """
-    if not config.is_tool_enabled("delete_view"):
+    if not get_config().is_tool_enabled("delete_view"):
         return json.dumps({"error": "Tool is disabled"})
 
     result = client.delete_view(view_id)
@@ -734,7 +752,7 @@ def delete_view(view_id: str) -> str:
 # ── Notifier Tools ──
 
 
-@mcp.tool()
+@get_mcp().tool()
 def get_notifiers() -> str:
     """
     Get list of configured notifiers.
@@ -742,17 +760,17 @@ def get_notifiers() -> str:
     Returns:
         JSON string with list of notifiers
     """
-    if not config.is_tool_enabled("get_notifiers"):
+    if not get_config().is_tool_enabled("get_notifiers"):
         return json.dumps({"error": "Tool is disabled"})
 
-    notifiers = client.get_notifiers()
+    notifiers = get_client().get_notifiers()
     return json.dumps(notifiers, indent=2)
 
 
 # ── Parliament (Multi-cluster) Tools ──
 
 
-@mcp.tool()
+@get_mcp().tool()
 def get_parliament() -> str:
     """
     Get parliament (multi-cluster) information.
@@ -760,10 +778,10 @@ def get_parliament() -> str:
     Returns:
         JSON string with parliament configuration and cluster status
     """
-    if not config.is_tool_enabled("get_parliament"):
+    if not get_config().is_tool_enabled("get_parliament"):
         return json.dumps({"error": "Tool is disabled"})
 
-    parliament = client.get_parliament()
+    parliament = get_client().get_parliament()
     return json.dumps(parliament, indent=2)
 
 
@@ -772,7 +790,7 @@ def get_parliament() -> str:
 
 def main():
     """Main entry point for the MCP server."""
-    mcp.run()
+    get_mcp().run()
 
 
 if __name__ == "__main__":
