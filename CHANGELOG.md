@@ -40,7 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - examples.py with usage examples
   - config.example.yaml template
   - .env.example template
-- **Testing**: Basic test suite (test_basic.py)
+- **Testing**:
+  - Comprehensive unit test suite with pytest
+  - 46 unit tests covering core functionality
+  - 100% coverage on utils and config modules
+  - 67% coverage on client module
+  - pytest configuration with coverage reporting
+  - GitHub Actions CI workflow
+  - Detailed testing documentation (tests/README.md)
 - **Utilities**: Improved helper functions for formatting
 
 ### Fixed

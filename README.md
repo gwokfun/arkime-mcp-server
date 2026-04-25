@@ -180,12 +180,27 @@ arkime_mcp_server/
 ### Testing
 
 ```bash
-# Install dev dependencies
+# Install dependencies
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
-# Run tests (if available)
+# Run tests
 pytest
+
+# Run tests with coverage
+pytest --cov=arkime_mcp_server --cov-report=term-missing
+
+# Run tests with HTML coverage report
+pytest --cov=arkime_mcp_server --cov-report=html
 ```
+
+See [tests/README.md](tests/README.md) for detailed testing documentation.
+
+**Test Coverage:**
+- 46 unit tests covering core functionality
+- 100% coverage on utils and config modules
+- 67% coverage on client module
+- All tests pass in ~1.3 seconds
 
 ## API Coverage
 
