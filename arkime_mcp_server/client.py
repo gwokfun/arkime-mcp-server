@@ -3,14 +3,26 @@ Arkime viewer API client with HTTP Digest authentication.
 """
 
 import hashlib
+import secrets
 import httpx
 from typing import Any, Dict, Optional, Union
 from urllib.parse import urljoin
 import re
 
+# Constants
+CNONCE_LENGTH = 8
+DEFAULT_TIMEOUT = 30.0
+MAX_SESSION_LIMIT = 200
+
 
 class DigestAuth(httpx.Auth):
-    """HTTP Digest Authentication handler for httpx."""
+    """
+    HTTP Digest Authentication handler for httpx.
+
+    Note: Uses MD5 hashing as required by RFC 2617. While MD5 is cryptographically
+    weak, it is the standard for HTTP Digest Authentication. Consider using more
+    secure authentication methods (e.g., OAuth2, API tokens) when possible.
+    """
 
     def __init__(self, username: str, password: str):
         self.username = username
@@ -27,8 +39,11 @@ class DigestAuth(httpx.Auth):
             if "Digest" in auth_header:
                 self._challenge = self._parse_challenge(auth_header)
 
-                # Build the Authorization header
-                auth = self._build_digest_header(request.method, str(request.url.path))
+                # Build the Authorization header with full URI (path + query)
+                uri = str(request.url.path)
+                if request.url.query:
+                    uri += f"?{request.url.query.decode() if isinstance(request.url.query, bytes) else request.url.query}"
+                auth = self._build_digest_header(request.method, uri)
                 request.headers["Authorization"] = auth
 
                 # Retry the request with auth
@@ -65,7 +80,8 @@ class DigestAuth(httpx.Auth):
         # Calculate response
         if qop:
             nc = "00000001"
-            cnonce = hashlib.md5(b"client_nonce").hexdigest()[:8]
+            # Generate random cnonce for security
+            cnonce = secrets.token_hex(CNONCE_LENGTH)
             response_hash = hashlib.md5(
                 f"{ha1}:{nonce}:{nc}:{cnonce}:{qop}:{ha2}".encode()
             ).hexdigest()
@@ -112,7 +128,7 @@ class ArkimeClient:
         """
         self.base_url = base_url.rstrip("/")
         self.auth = DigestAuth(username, password)
-        self.client = httpx.Client(auth=self.auth, timeout=30.0)
+        self.client = httpx.Client(auth=self.auth, timeout=DEFAULT_TIMEOUT)
 
     def __enter__(self):
         return self
@@ -232,8 +248,8 @@ class ArkimeClient:
         Args:
             expression: Arkime search expression
             date: Time range in hours (or -1 for all)
-            length: Max results to return
-            start: Starting index for pagination
+            length: Max results to return (1-200)
+            start: Starting index for pagination (>= 0)
             fields: Comma-separated list of fields to return
             order: Sort order (e.g., "totDataBytes:desc")
             start_time: Unix timestamp in milliseconds
@@ -241,7 +257,16 @@ class ArkimeClient:
 
         Returns:
             Session search results
+
+        Raises:
+            ValueError: If parameters are out of valid range
         """
+        # Input validation
+        if not 1 <= length <= MAX_SESSION_LIMIT:
+            raise ValueError(f"length must be between 1 and {MAX_SESSION_LIMIT}")
+        if start < 0:
+            raise ValueError("start must be >= 0")
+
         params: Dict[str, Any] = {"date": date, "length": length, "start": start}
 
         if expression:

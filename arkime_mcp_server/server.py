@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional, List
 from fastmcp import FastMCP
 
-from .client import ArkimeClient
+from .client import ArkimeClient, MAX_SESSION_LIMIT
 from .config import Config
 from .utils import format_bytes, format_timestamp, protocol_name, summarize_session
 
@@ -88,7 +88,7 @@ def search_sessions(
     if not get_config().is_tool_enabled("search_sessions"):
         return json.dumps({"error": "Tool is disabled"})
 
-    length = max(1, min(limit, 200))
+    length = max(1, min(limit, MAX_SESSION_LIMIT))
     result = get_client().get_sessions(
         expression=expression, date=hours, length=length, order=order
     )

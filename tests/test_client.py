@@ -5,7 +5,7 @@ Unit tests for client module.
 import pytest
 import httpx
 from unittest.mock import Mock, patch, MagicMock
-from arkime_mcp_server.client import DigestAuth, ArkimeClient
+from arkime_mcp_server.client import DigestAuth, ArkimeClient, MAX_SESSION_LIMIT
 
 
 class TestDigestAuth:
@@ -300,3 +300,42 @@ class TestArkimeClient:
 
         assert result == {"deleted": True}
         mock_http_client.delete.assert_called_once()
+
+    def test_get_sessions_input_validation_length(self):
+        """Test input validation for length parameter."""
+        client = ArkimeClient("http://test.local:8005", "user", "pass")
+
+        # Test length too small
+        with pytest.raises(ValueError, match="length must be between 1 and"):
+            client.get_sessions(length=0)
+
+        # Test length too large
+        with pytest.raises(ValueError, match="length must be between 1 and"):
+            client.get_sessions(length=MAX_SESSION_LIMIT + 1)
+
+    def test_get_sessions_input_validation_start(self):
+        """Test input validation for start parameter."""
+        client = ArkimeClient("http://test.local:8005", "user", "pass")
+
+        # Test negative start
+        with pytest.raises(ValueError, match="start must be >= 0"):
+            client.get_sessions(start=-1)
+
+    def test_cnonce_randomness(self):
+        """Test that cnonce is randomly generated."""
+        auth = DigestAuth("testuser", "testpass")
+        auth._challenge = {
+            "realm": "TestRealm",
+            "nonce": "testnonce",
+            "qop": "auth",
+            "algorithm": "MD5",
+        }
+
+        # Generate two headers and verify cnonce is different
+        header1 = auth._build_digest_header("GET", "/api/test")
+        header2 = auth._build_digest_header("GET", "/api/test")
+
+        # Extract cnonce values (they should be different due to randomness)
+        # Since we can't easily extract them, we just verify the headers are different
+        # (they will be different due to different cnonce and response hash)
+        assert header1 != header2
