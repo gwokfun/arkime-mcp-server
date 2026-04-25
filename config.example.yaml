@@ -1,0 +1,67 @@
+# Arkime MCP Server Configuration
+# Copy this file to config.yaml and customize as needed
+
+# Arkime connection settings
+# These can be overridden by environment variables:
+# - ARKIME_URL
+# - ARKIME_USER
+# - ARKIME_PASSWORD
+arkime:
+  url: "http://192.168.5.176:8005"
+  user: "mcp"
+  # password is required and should be set via ARKIME_PASSWORD env var
+
+# Tool enablement configuration
+# Set to false to disable specific tools
+tools:
+  # Session Search & Analysis
+  search_sessions: true
+  get_session_detail: true
+  get_session_packets: true
+  get_session_pcap: true
+  get_session_raw: true
+
+  # Network Investigation
+  top_talkers: true
+  connections_graph: true
+  unique_destinations: true
+  dns_lookups: true
+  reverse_dns: true
+
+  # Security & Anomaly
+  external_connections: true
+  geo_summary: true
+
+  # System Health & Info
+  capture_status: true
+  pcap_files: true
+  list_fields: true
+  get_field_values: true
+
+  # User & Settings
+  get_current_user: true
+  get_settings: true
+
+  # Tags & Annotations
+  add_tags: true
+  remove_tags: true
+
+  # Statistics
+  get_stats: true
+  get_es_stats: true
+
+  # Hunt & Jobs
+  create_hunt: true
+  get_hunts: true
+  delete_hunt: true
+
+  # Views
+  create_view: true
+  get_views: true
+  delete_view: true
+
+  # Notifiers
+  get_notifiers: true
+
+  # Parliament (Multi-cluster)
+  get_parliament: true
