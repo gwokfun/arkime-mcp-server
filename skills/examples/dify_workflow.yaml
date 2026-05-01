@@ -1,0 +1,191 @@
+# Dify Workflow Configuration for Arkime Skills
+# This example shows how to configure Arkime skills in Dify platform
+
+# Dify uses a YAML-based custom tool format
+# Place this file in your Dify custom tools directory
+
+version: "1.0"
+type: custom_tools
+
+tools:
+  # Example: Search Sessions Tool
+  - name: arkime_search_sessions
+    display_name: "Search Network Sessions"
+    description: >
+      Search Arkime captured network sessions with an optional filter expression.
+      Returns session summaries including source/destination IPs, ports, protocol,
+      bytes transferred, geolocation, and AS information.
+    icon: "🔍"
+    category: "network_security"
+
+    input_schema:
+      - name: expression
+        type: string
+        required: false
+        label: "Search Expression"
+        placeholder: "ip.src==192.168.1.10"
+        description: "Arkime search expression (leave empty for all sessions)"
+
+      - name: hours
+        type: integer
+        required: false
+        default: 1
+        label: "Time Window (hours)"
+        description: "Time window in hours from now (-1 for all)"
+
+      - name: limit
+        type: integer
+        required: false
+        default: 50
+        label: "Result Limit"
+        description: "Maximum number of sessions to return (1-200)"
+
+      - name: order
+        type: string
+        required: false
+        label: "Sort Order"
+        placeholder: "totDataBytes:desc"
+        description: "Sort order as 'field:dir'"
+
+    # HTTP endpoint configuration
+    # In production, point this to your Arkime MCP server HTTP wrapper
+    endpoint:
+      method: POST
+      url: "http://localhost:3000/api/skills/search_sessions"
+      headers:
+        Content-Type: "application/json"
+      auth:
+        type: bearer
+        token: "${ARKIME_API_TOKEN}"
+
+    output_schema:
+      type: object
+      properties:
+        total_matching:
+          type: integer
+          description: "Total sessions matching query"
+        returned:
+          type: integer
+          description: "Number of sessions in response"
+        sessions:
+          type: array
+          description: "Session summaries"
+
+  # Example: Top Talkers Tool
+  - name: arkime_top_talkers
+    display_name: "Top Talkers Analysis"
+    description: >
+      Identify the top N values for any session field ranked by session count.
+      Ideal for finding the most active hosts, busiest ports, or most-queried domains.
+    icon: "📊"
+    category: "network_security"
+
+    input_schema:
+      - name: field
+        type: select
+        required: false
+        default: "source.ip"
+        label: "Field to Analyze"
+        options:
+          - value: "source.ip"
+            label: "Source IP"
+          - value: "destination.ip"
+            label: "Destination IP"
+          - value: "destination.port"
+            label: "Destination Port"
+          - value: "host.dns"
+            label: "DNS Host"
+          - value: "http.uri"
+            label: "HTTP URI"
+          - value: "http.method"
+            label: "HTTP Method"
+
+      - name: expression
+        type: string
+        required: false
+        label: "Filter Expression"
+
+      - name: hours
+        type: integer
+        required: false
+        default: 1
+        label: "Time Window (hours)"
+
+      - name: limit
+        type: integer
+        required: false
+        default: 20
+        label: "Number of Top Entries"
+
+    endpoint:
+      method: POST
+      url: "http://localhost:3000/api/skills/top_talkers"
+      headers:
+        Content-Type: "application/json"
+      auth:
+        type: bearer
+        token: "${ARKIME_API_TOKEN}"
+
+# Dify Workflow Node Configuration
+# Example workflow: Alert Triage
+workflows:
+  - name: "SOC Alert Triage"
+    description: "Automated network alert triage workflow"
+
+    nodes:
+      - id: "input"
+        type: "input"
+        config:
+          variables:
+            - name: "alert_ip"
+              type: "string"
+              description: "IP address from alert"
+            - name: "time_window"
+              type: "integer"
+              default: 1
+              description: "Hours to search"
+
+      - id: "search"
+        type: "tool"
+        tool: "arkime_search_sessions"
+        config:
+          inputs:
+            expression: "ip.src=={{input.alert_ip}}"
+            hours: "{{input.time_window}}"
+            limit: 50
+
+      - id: "analyze"
+        type: "tool"
+        tool: "arkime_top_talkers"
+        config:
+          inputs:
+            field: "destination.ip"
+            expression: "ip.src=={{input.alert_ip}}"
+            hours: "{{input.time_window}}"
+
+      - id: "summarize"
+        type: "llm"
+        config:
+          model: "gpt-4"
+          prompt: >
+            Based on the following network session data for IP {{input.alert_ip}}:
+
+            Sessions: {{search.output}}
+            Top Destinations: {{analyze.output}}
+
+            Provide a security analysis summary including:
+            1. Risk assessment (low/medium/high)
+            2. Key findings
+            3. Recommended actions
+
+      - id: "output"
+        type: "output"
+        config:
+          outputs:
+            - "{{summarize.output}}"
+
+# Integration Notes:
+# 1. Deploy an HTTP wrapper around the Arkime MCP server for Dify to call
+# 2. Set ARKIME_API_TOKEN environment variable in Dify
+# 3. Import this YAML into Dify custom tools
+# 4. Configure workflows using the visual editor
