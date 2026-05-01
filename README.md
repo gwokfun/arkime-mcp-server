@@ -236,29 +236,83 @@ This project has been refactored from TypeScript to Python 3. Key changes:
 
 In addition to MCP, Arkime tools are exposed as **agentskills.io**-compatible skills so they can be used on any mainstream AI agent platform (Claude, GPT-4, Gemini, LangChain, AutoGen, CrewAI, Dify, Coze, etc.).
 
-The skills manifest is at [`skills/arkime_skills.yaml`](skills/arkime_skills.yaml).  
-Design rationale, brainstorming, and a full implementation plan are in [`skills/README.md`](skills/README.md).
+### What's Included
 
-**Application directions covered by the skills:**
+✅ **Skills Manifest** ([`skills/arkime_skills.yaml`](skills/arkime_skills.yaml)) - 29 skills in agentskills.io v1.0 format
+✅ **Agent Integration Examples** ([`skills/examples/`](skills/examples/)) - Ready-to-use adapters for popular platforms
+✅ **Scenario Playbooks** ([`skills/playbooks/`](skills/playbooks/)) - Step-by-step investigation workflows
+✅ **Validation Testing** ([`skills/tests/`](skills/tests/)) - Automated validation against MCP tools
 
-| Scenario | Key Skills |
-|----------|-----------|
-| SOC Automation | `search_sessions`, `add_tags`, `geo_summary` |
-| Threat Hunting | `dns_lookups`, `connections_graph`, `create_hunt`, `external_connections` |
-| Incident Response | `get_session_detail`, `unique_destinations`, `get_session_packets` |
-| Network Monitoring | `top_talkers`, `capture_status`, `get_stats` |
-| Compliance & Audit | `external_connections`, `pcap_files`, `get_current_user` |
-| Multi-cluster Ops | `get_parliament`, `capture_status` |
+Design rationale and implementation details are in [`skills/README.md`](skills/README.md).
 
-**Quick start — load skills in Python:**
+### Integration Examples
 
+**OpenAI GPT-4:**
+```bash
+python skills/examples/openai_converter.py > openai_functions.json
+```
+
+**Anthropic Claude:**
+```bash
+python skills/examples/anthropic_converter.py > anthropic_tools.json
+```
+
+**LangChain:**
+```python
+from skills.examples.langchain_agent import ArkimeSkillsAdapter
+
+adapter = ArkimeSkillsAdapter()
+tools = adapter.get_langchain_tools()
+# Or filter by use case: adapter.get_tools_by_use_case("soc")
+```
+
+**Microsoft AutoGen:**
+```python
+from skills.examples.autogen_config import ArkimeAutoGenConfig
+
+config = ArkimeAutoGenConfig()
+llm_config = config.create_agent_config(use_case="threat_hunting")
+```
+
+See [`skills/examples/README.md`](skills/examples/README.md) for complete integration guides.
+
+### Scenario Playbooks
+
+Pre-built investigation workflows that chain multiple skills:
+
+- **[SOC Alert Triage](skills/playbooks/alert_triage.md)** - Automated alert enrichment and triage
+- **[Data Exfiltration Hunt](skills/playbooks/data_exfiltration_hunt.md)** - Proactive threat hunting for data theft
+- **[Host Forensics](skills/playbooks/host_forensics.md)** - Comprehensive compromised host investigation
+- **[DNS Tunnel Detection](skills/playbooks/dns_tunnel_detection.md)** - Detect DNS-based C2 and exfiltration
+
+See [`skills/playbooks/README.md`](skills/playbooks/README.md) for usage examples.
+
+### Application Scenarios
+
+| Scenario | Key Skills | Playbook |
+|----------|-----------|----------|
+| SOC Automation | `search_sessions`, `add_tags`, `geo_summary` | [Alert Triage](skills/playbooks/alert_triage.md) |
+| Threat Hunting | `dns_lookups`, `connections_graph`, `create_hunt`, `external_connections` | [Data Exfiltration Hunt](skills/playbooks/data_exfiltration_hunt.md) |
+| Incident Response | `get_session_detail`, `unique_destinations`, `get_session_packets` | [Host Forensics](skills/playbooks/host_forensics.md) |
+| Network Monitoring | `top_talkers`, `capture_status`, `get_stats` | - |
+| Compliance & Audit | `external_connections`, `pcap_files`, `get_current_user` | - |
+| Multi-cluster Ops | `get_parliament`, `capture_status` | - |
+
+### Quick Start
+
+**Load skills programmatically:**
 ```python
 import yaml
 
 with open("skills/arkime_skills.yaml") as f:
     manifest = yaml.safe_load(f)
 
-skills = manifest["skills"]  # list of 30 skill definitions
+skills = manifest["skills"]  # list of 29 skill definitions
+```
+
+**Validate skills manifest:**
+```bash
+python skills/tests/validate_skills.py
 ```
 
 ## License
