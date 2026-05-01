@@ -7,6 +7,7 @@ Provides MCP tools for Arkime full packet capture system.
 import sys
 import json
 import atexit
+import logging
 import threading
 from typing import Any, Dict, Optional
 from fastmcp import FastMCP
@@ -29,7 +30,7 @@ def _cleanup():
         try:
             _client.close()
         except Exception:
-            pass
+            logging.exception("Error during client cleanup")
 
 
 atexit.register(_cleanup)
