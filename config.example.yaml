@@ -7,7 +7,8 @@
 # - ARKIME_USER
 # - ARKIME_PASSWORD
 arkime:
-  url: "http://192.168.5.176:8005"
+  # Prefer HTTPS in production to protect credentials in transit.
+  url: "http://your-arkime-server:8005"
   user: "mcp"
   # password is required and should be set via ARKIME_PASSWORD env var
 

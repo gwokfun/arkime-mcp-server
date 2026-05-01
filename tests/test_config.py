@@ -32,7 +32,7 @@ class TestConfig:
         os.environ["ARKIME_PASSWORD"] = "test-password"
         try:
             config = Config()
-            assert config.arkime_url == "http://192.168.5.176:8005"
+            assert config.arkime_url == "http://your-arkime-server:8005"
             assert config.arkime_user == "mcp"
             assert config.arkime_password == "test-password"
         finally:
