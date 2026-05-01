@@ -94,7 +94,7 @@ pip install arkime-mcp-server
 
 | 变量 | 是否必需 | 默认值 | 描述 |
 |------|----------|--------|------|
-| `ARKIME_URL` | 否 | `http://192.168.5.176:8005` | Arkime Viewer 地址 |
+| `ARKIME_URL` | 否 | `http://your-arkime-server:8005` | Arkime Viewer 地址（生产环境建议使用 HTTPS） |
 | `ARKIME_USER` | 否 | `mcp` | Arkime API 用户名 |
 | `ARKIME_PASSWORD` | **是** | — | Arkime API 密码 |
 

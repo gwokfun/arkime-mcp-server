@@ -26,7 +26,7 @@ class Config:
         # Default configuration
         self.config: Dict[str, Any] = {
             "arkime": {
-                "url": "http://192.168.5.176:8005",
+                "url": "http://your-arkime-server:8005",
                 "user": "mcp",
                 "password": None,
             },

@@ -6,6 +6,8 @@ Provides MCP tools for Arkime full packet capture system.
 
 import sys
 import json
+import atexit
+import threading
 from typing import Any, Dict, Optional
 from fastmcp import FastMCP
 
@@ -17,17 +19,33 @@ from .utils import format_bytes, format_timestamp, protocol_name, summarize_sess
 _config = None
 _client = None
 _mcp = None
+_init_lock = threading.Lock()
+
+
+def _cleanup():
+    """Cleanup resources on process exit."""
+    global _client
+    if _client is not None:
+        try:
+            _client.close()
+        except Exception:
+            pass
+
+
+atexit.register(_cleanup)
 
 
 def get_config():
     """Get or initialize configuration."""
     global _config
     if _config is None:
-        try:
-            _config = Config()
-        except ValueError as e:
-            print(f"Configuration error: {e}", file=sys.stderr)
-            sys.exit(1)
+        with _init_lock:
+            if _config is None:
+                try:
+                    _config = Config()
+                except ValueError as e:
+                    print(f"Configuration error: {e}", file=sys.stderr)
+                    sys.exit(1)
     return _config
 
 
@@ -35,8 +53,12 @@ def get_client():
     """Get or initialize Arkime client."""
     global _client
     if _client is None:
-        config = get_config()
-        _client = ArkimeClient(config.arkime_url, config.arkime_user, config.arkime_password)
+        with _init_lock:
+            if _client is None:
+                config = get_config()
+                _client = ArkimeClient(
+                    config.arkime_url, config.arkime_user, config.arkime_password
+                )
     return _client
 
 
@@ -44,7 +66,9 @@ def get_mcp():
     """Get or initialize MCP server."""
     global _mcp
     if _mcp is None:
-        _mcp = FastMCP("arkime")
+        with _init_lock:
+            if _mcp is None:
+                _mcp = FastMCP("arkime")
     return _mcp
 
 

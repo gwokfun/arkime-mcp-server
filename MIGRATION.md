@@ -134,7 +134,7 @@ export ARKIME_PASSWORD="your-password"
 **After (same, with .env support):**
 ```bash
 # .env file
-ARKIME_URL=http://192.168.5.176:8005
+ARKIME_URL=http://your-arkime-server:8005
 ARKIME_USER=mcp
 ARKIME_PASSWORD=your-password
 ```
@@ -144,7 +144,7 @@ ARKIME_PASSWORD=your-password
 ```yaml
 # config.yaml
 arkime:
-  url: "http://192.168.5.176:8005"
+  url: "http://your-arkime-server:8005"
   user: "mcp"
 
 tools:
