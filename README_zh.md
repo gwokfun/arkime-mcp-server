@@ -230,6 +230,24 @@ pytest --cov=arkime_mcp_server --cov-report=html
 - **工具管理**：新功能，可通过配置文件启用/禁用工具
 - **API 覆盖**：从 12 个工具扩展到 30+ 个工具，覆盖所有主要 Arkime API
 
+## 技能（agentskills.io）
+
+除 MCP 协议外，Arkime 工具还以 **agentskills.io** 兼容技能的形式暴露，可在任意主流 AI Agent 平台上使用（Claude、GPT-4、Gemini、LangChain、AutoGen、CrewAI、Dify、Coze 等）。
+
+技能清单位于 [`skills/arkime_skills.yaml`](skills/arkime_skills.yaml)。  
+头脑风暴、设计方案与实施计划详见 [`skills/README.md`](skills/README.md)。
+
+**技能覆盖的应用场景：**
+
+| 场景 | 核心技能 |
+|------|---------|
+| SOC 自动化 | `search_sessions`, `add_tags`, `geo_summary` |
+| 威胁狩猎 | `dns_lookups`, `connections_graph`, `create_hunt`, `external_connections` |
+| 事件响应 | `get_session_detail`, `unique_destinations`, `get_session_packets` |
+| 网络监控 | `top_talkers`, `capture_status`, `get_stats` |
+| 合规与审计 | `external_connections`, `pcap_files`, `get_current_user` |
+| 多集群运维 | `get_parliament`, `capture_status` |
+
 ## 许可证
 
 MIT
