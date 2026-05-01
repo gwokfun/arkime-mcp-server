@@ -16,14 +16,14 @@ def test_imports():
         print("  ✓ Client module")
     except Exception as e:
         print(f"  ✗ Client module: {e}")
-        return False
+        assert False
 
     try:
         from arkime_mcp_server.config import Config
         print("  ✓ Config module")
     except Exception as e:
         print(f"  ✗ Config module: {e}")
-        return False
+        assert False
 
     try:
         from arkime_mcp_server.utils import (
@@ -35,9 +35,7 @@ def test_imports():
         print("  ✓ Utils module")
     except Exception as e:
         print(f"  ✗ Utils module: {e}")
-        return False
-
-    return True
+        assert False
 
 
 def test_utils():
@@ -63,7 +61,6 @@ def test_utils():
     assert format_timestamp(1000000000000) != "—", "format_timestamp with value failed"
     print("  ✓ format_timestamp()")
 
-    return True
 
 
 def test_digest_auth():
@@ -77,7 +74,6 @@ def test_digest_auth():
     assert auth.password == "testpass", "DigestAuth password failed"
     print("  ✓ DigestAuth initialization")
 
-    return True
 
 
 def main():

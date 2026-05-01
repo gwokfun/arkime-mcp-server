@@ -96,7 +96,7 @@ Set these environment variables or create a `.env` file:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ARKIME_URL` | No | `http://192.168.5.176:8005` | Arkime viewer URL |
+| `ARKIME_URL` | No | `http://your-arkime-server:8005` | Arkime viewer URL (prefer HTTPS in production) |
 | `ARKIME_USER` | No | `mcp` | Arkime API username |
 | `ARKIME_PASSWORD` | **Yes** | — | Arkime API password |
 
