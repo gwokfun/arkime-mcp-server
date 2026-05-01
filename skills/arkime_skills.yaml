@@ -1,0 +1,774 @@
+# Arkime Network Analysis Skills Manifest
+# Following agentskills.io specification
+# Compatible with any mainstream AI agent: Claude, GPT-4, Gemini, LangChain, AutoGen, etc.
+#
+# Each skill maps 1-to-1 to an Arkime MCP tool so the same capability can be
+# invoked through either the MCP protocol (stdio) or via skills invocation on
+# any agent platform that supports the agentskills.io spec.
+
+# version: agentskills.io manifest specification version (not the arkime-mcp-server package version)
+version: "1.0"
+
+metadata:
+  name: arkime-network-analysis
+  display_name: "Arkime Network Analysis Skills"
+  description: >-
+    A collection of AI agent skills for network security investigation,
+    threat hunting, and traffic analysis powered by the Arkime full-packet
+    capture platform. Compatible with any mainstream AI agent framework.
+  provider: arkime-mcp-server
+  homepage: https://github.com/gwokfun/arkime-mcp-server
+  license: MIT
+  tags:
+    - network-security
+    - packet-capture
+    - threat-hunting
+    - soc
+    - incident-response
+
+# ── Application categories ──────────────────────────────────────────────────
+# Skills are tagged with one or more "use_cases" so agents can discover the
+# right skill for a given scenario without knowing the tool name.
+#
+# Defined use-case tags:
+#   soc              – Security Operations Center automation
+#   threat_hunting   – Proactive threat hunting
+#   incident_response – Forensic investigation during/after incidents
+#   network_monitoring – Real-time traffic monitoring & anomaly detection
+#   compliance       – Audit trail and regulatory compliance
+#   multi_cluster    – Multi-site / Parliament cluster management
+
+skills:
+
+  # ── Session Search & Analysis ─────────────────────────────────────────────
+
+  - name: search_sessions
+    display_name: "Search Network Sessions"
+    description: >-
+      Search Arkime captured network sessions with an optional filter
+      expression. Returns session summaries including source/destination IPs,
+      ports, protocol, bytes transferred, geolocation, and AS information.
+      Use this as the primary starting point for any network investigation.
+    use_cases:
+      - soc
+      - threat_hunting
+      - incident_response
+      - network_monitoring
+      - compliance
+    parameters:
+      - name: expression
+        type: string
+        required: false
+        description: >-
+          Arkime search expression, e.g. 'ip.src==192.168.1.10',
+          'port.dst==443 && ip.dst!=10.0.0.0/8', 'http.method==POST'.
+          Leave empty to return all sessions in the time window.
+      - name: hours
+        type: integer
+        required: false
+        default: 1
+        description: >-
+          Time window in hours from now. Use -1 to query all available data.
+      - name: limit
+        type: integer
+        required: false
+        default: 50
+        description: Maximum number of sessions to return (1–200).
+      - name: order
+        type: string
+        required: false
+        description: >-
+          Sort order as 'field:dir', e.g. 'totDataBytes:desc', 'firstPacket:asc'.
+    output:
+      type: object
+      properties:
+        total_matching:
+          type: integer
+          description: Total sessions matching the query.
+        returned:
+          type: integer
+          description: Number of sessions returned in this response.
+        sessions:
+          type: array
+          description: List of session summaries.
+
+  - name: get_session_detail
+    display_name: "Get Session Detail"
+    description: >-
+      Retrieve the full decoded protocol detail for a single captured session,
+      including all protocol headers, payload summaries, and metadata.
+    use_cases:
+      - incident_response
+      - threat_hunting
+      - soc
+    parameters:
+      - name: node
+        type: string
+        required: true
+        description: Arkime capture node name (obtained from search_sessions results).
+      - name: session_id
+        type: string
+        required: true
+        description: Unique session ID (obtained from search_sessions results).
+    output:
+      type: object
+      description: Full decoded protocol information for the session.
+
+  - name: get_session_packets
+    display_name: "Get Session Packets"
+    description: >-
+      Retrieve decoded packet-level data for a captured session. Useful for
+      deep inspection of specific payloads during incident response.
+    use_cases:
+      - incident_response
+      - threat_hunting
+    parameters:
+      - name: node
+        type: string
+        required: true
+        description: Arkime capture node name.
+      - name: session_id
+        type: string
+        required: true
+        description: Unique session ID.
+    output:
+      type: object
+      description: Decoded packet contents for the session.
+
+  - name: get_session_raw
+    display_name: "Get Raw Session Data"
+    description: >-
+      Retrieve raw (un-decoded) session data. Useful when lower-level byte
+      inspection is needed during forensic analysis.
+    use_cases:
+      - incident_response
+    parameters:
+      - name: node
+        type: string
+        required: true
+        description: Arkime capture node name.
+      - name: session_id
+        type: string
+        required: true
+        description: Unique session ID.
+    output:
+      type: string
+      description: Raw session data as a string.
+
+  # ── Network Investigation ──────────────────────────────────────────────────
+
+  - name: top_talkers
+    display_name: "Top Talkers"
+    description: >-
+      Identify the top N values for any session field (source IP, destination
+      IP, port, domain, URI, etc.) ranked by session count. Ideal for finding
+      the most active hosts, busiest ports, or most-queried domains.
+    use_cases:
+      - network_monitoring
+      - threat_hunting
+      - soc
+    parameters:
+      - name: field
+        type: string
+        required: false
+        default: "source.ip"
+        description: >-
+          Arkime field to aggregate. Common values: 'source.ip',
+          'destination.ip', 'destination.port', 'host.dns', 'http.uri'.
+        enum:
+          - source.ip
+          - destination.ip
+          - destination.port
+          - host.dns
+          - http.uri
+          - http.method
+          - email.dst
+          - tls.ja3
+      - name: expression
+        type: string
+        required: false
+        description: Optional Arkime filter expression.
+      - name: hours
+        type: integer
+        required: false
+        default: 1
+        description: Time window in hours from now.
+      - name: limit
+        type: integer
+        required: false
+        default: 20
+        description: Number of top entries to return.
+    output:
+      type: string
+      description: Newline-separated list of field values with session counts.
+
+  - name: connections_graph
+    display_name: "Network Connection Graph"
+    description: >-
+      Generate a network connection graph showing which hosts are communicating
+      with which destinations. Returns nodes (hosts) and links (connections)
+      with byte, packet, and session counts. Useful for visualizing lateral
+      movement or data exfiltration paths.
+    use_cases:
+      - threat_hunting
+      - incident_response
+      - network_monitoring
+    parameters:
+      - name: expression
+        type: string
+        required: false
+        description: Optional Arkime filter expression.
+      - name: hours
+        type: integer
+        required: false
+        default: 1
+        description: Time window in hours from now.
+      - name: src_field
+        type: string
+        required: false
+        default: "source.ip"
+        description: Source field for graph nodes.
+      - name: dst_field
+        type: string
+        required: false
+        default: "ip.dst:port"
+        description: Destination field for graph nodes.
+      - name: limit
+        type: integer
+        required: false
+        default: 50
+        description: Maximum number of connections to return.
+    output:
+      type: object
+      properties:
+        nodes:
+          type: array
+          description: List of nodes (hosts) with session/byte/packet counts.
+        links:
+          type: array
+          description: List of edges connecting source and destination nodes.
+
+  - name: unique_destinations
+    display_name: "Unique External Destinations"
+    description: >-
+      List all distinct external (non-RFC1918) IP addresses contacted by a
+      specific internal host. Answers the question "what is this device
+      talking to outside the network?"
+    use_cases:
+      - threat_hunting
+      - incident_response
+      - soc
+    parameters:
+      - name: source_ip
+        type: string
+        required: true
+        description: Internal IP address to investigate.
+      - name: hours
+        type: integer
+        required: false
+        default: 1
+        description: Time window in hours from now.
+      - name: limit
+        type: integer
+        required: false
+        default: 50
+        description: Maximum number of destinations to return.
+    output:
+      type: string
+      description: Newline-separated list of external IPs contacted.
+
+  - name: dns_lookups
+    display_name: "DNS Lookup History"
+    description: >-
+      Search DNS queries captured in network traffic. Filter by domain name
+      pattern or source IP to discover what hostnames a device is resolving.
+      Useful for detecting malware C2 beacon domains or data exfiltration
+      via DNS tunnelling.
+    use_cases:
+      - threat_hunting
+      - incident_response
+      - soc
+    parameters:
+      - name: domain
+        type: string
+        required: false
+        description: >-
+          Domain name pattern to search for. Supports wildcards,
+          e.g. '*.evil.com', 'malware.example.net'.
+      - name: source_ip
+        type: string
+        required: false
+        description: Only return DNS queries from this source IP.
+      - name: hours
+        type: integer
+        required: false
+        default: 1
+        description: Time window in hours from now.
+      - name: limit
+        type: integer
+        required: false
+        default: 30
+        description: Maximum number of results to return.
+    output:
+      type: string
+      description: Newline-separated list of DNS queries with session counts.
+
+  - name: reverse_dns
+    display_name: "Reverse DNS Lookup"
+    description: >-
+      Perform a PTR/reverse DNS lookup for an IP address using data already
+      captured in Arkime. No external DNS queries are needed.
+    use_cases:
+      - incident_response
+      - threat_hunting
+      - soc
+    parameters:
+      - name: ip
+        type: string
+        required: true
+        description: IP address to look up.
+    output:
+      type: object
+      description: Reverse DNS records for the IP address.
+
+  # ── Security & Anomaly Detection ──────────────────────────────────────────
+
+  - name: external_connections
+    display_name: "External Connection Analysis"
+    description: >-
+      Find all network sessions destined for external (non-RFC1918) IP
+      addresses. Sorted by bytes transferred to highlight potential data
+      exfiltration. Optionally filter to a single source IP.
+    use_cases:
+      - threat_hunting
+      - soc
+      - compliance
+      - incident_response
+    parameters:
+      - name: source_ip
+        type: string
+        required: false
+        description: >-
+          Filter to sessions originating from this internal IP.
+          Omit to include all internal hosts.
+      - name: hours
+        type: integer
+        required: false
+        default: 1
+        description: Time window in hours from now.
+      - name: limit
+        type: integer
+        required: false
+        default: 50
+        description: Maximum number of sessions to return.
+    output:
+      type: object
+      properties:
+        total_matching:
+          type: integer
+        returned:
+          type: integer
+        sessions:
+          type: array
+          description: Sessions sorted by bytes transferred (descending).
+
+  - name: geo_summary
+    display_name: "Geographic Traffic Summary"
+    description: >-
+      Break down outbound traffic by destination country. Quickly identify
+      unexpected geographic destinations that may indicate data exfiltration
+      or command-and-control communication with foreign infrastructure.
+    use_cases:
+      - threat_hunting
+      - compliance
+      - soc
+      - network_monitoring
+    parameters:
+      - name: expression
+        type: string
+        required: false
+        description: Optional Arkime filter expression.
+      - name: hours
+        type: integer
+        required: false
+        default: 1
+        description: Time window in hours from now.
+      - name: limit
+        type: integer
+        required: false
+        default: 30
+        description: Maximum number of countries to return.
+    output:
+      type: string
+      description: Newline-separated list of country codes with session counts.
+
+  # ── System Health & Info ──────────────────────────────────────────────────
+
+  - name: capture_status
+    display_name: "Arkime Capture Status"
+    description: >-
+      Check the health of the Arkime cluster including node count, shard
+      health, and OpenSearch/Elasticsearch version. Use to verify the capture
+      infrastructure is healthy before starting an investigation.
+    use_cases:
+      - network_monitoring
+      - soc
+    parameters: []
+    output:
+      type: object
+      properties:
+        cluster:
+          type: string
+          description: Cluster name.
+        status:
+          type: string
+          description: Overall health status (green/yellow/red).
+        nodes:
+          type: integer
+          description: Number of cluster nodes.
+        active_shards:
+          type: integer
+        unassigned_shards:
+          type: integer
+        opensearch_version:
+          type: string
+        arkime_db_version:
+          type: string
+
+  - name: pcap_files
+    display_name: "PCAP File List"
+    description: >-
+      List PCAP capture files stored on the Arkime cluster, including file
+      sizes, packet counts, compression ratios, and time ranges.
+    use_cases:
+      - network_monitoring
+      - compliance
+      - incident_response
+    parameters:
+      - name: limit
+        type: integer
+        required: false
+        default: 20
+        description: Maximum number of files to return.
+    output:
+      type: object
+      properties:
+        total_files:
+          type: integer
+        files:
+          type: array
+          description: List of PCAP file metadata.
+
+  - name: list_fields
+    display_name: "List Arkime Session Fields"
+    description: >-
+      Enumerate all available Arkime session fields that can be used in
+      search expressions and aggregations. Optionally filter by field group
+      (e.g. 'dns', 'http', 'email').
+    use_cases:
+      - soc
+      - threat_hunting
+    parameters:
+      - name: group
+        type: string
+        required: false
+        description: >-
+          Field group to filter by, e.g. 'dns', 'http', 'email', 'general',
+          'tls', 'ssh'.
+    output:
+      type: array
+      description: List of field definitions with expression, name, type, and group.
+
+  - name: get_field_values
+    display_name: "Get Field Value Enumeration"
+    description: >-
+      Retrieve the set of observed values for a specific Arkime field,
+      optionally narrowed by a filter expression. Useful for building
+      search expressions or understanding the data landscape.
+    use_cases:
+      - soc
+      - threat_hunting
+    parameters:
+      - name: field
+        type: string
+        required: true
+        description: Field name to enumerate values for.
+      - name: expression
+        type: string
+        required: false
+        description: Optional Arkime filter expression.
+    output:
+      type: object
+      description: Observed values and their counts for the specified field.
+
+  - name: get_current_user
+    display_name: "Get Current Arkime User"
+    description: >-
+      Retrieve information about the currently authenticated Arkime user,
+      including role assignments and permissions.
+    use_cases:
+      - compliance
+      - soc
+    parameters: []
+    output:
+      type: object
+      description: Authenticated user's profile and roles.
+
+  - name: get_settings
+    display_name: "Get Arkime Viewer Settings"
+    description: >-
+      Retrieve the Arkime viewer's global configuration settings.
+    use_cases:
+      - soc
+    parameters: []
+    output:
+      type: object
+      description: Viewer configuration settings.
+
+  - name: get_stats
+    display_name: "Get Arkime Statistics"
+    description: >-
+      Retrieve Arkime capture statistics such as packets/second, bytes/second,
+      dropped packets, and storage utilisation.
+    use_cases:
+      - network_monitoring
+      - soc
+    parameters: []
+    output:
+      type: object
+      description: Arkime capture and storage statistics.
+
+  - name: get_es_stats
+    display_name: "Get OpenSearch/Elasticsearch Statistics"
+    description: >-
+      Retrieve index-level statistics from the underlying OpenSearch or
+      Elasticsearch cluster used by Arkime.
+    use_cases:
+      - network_monitoring
+      - soc
+    parameters: []
+    output:
+      type: object
+      description: Index statistics including document counts and shard states.
+
+  # ── Tags & Annotations ────────────────────────────────────────────────────
+
+  - name: add_tags
+    display_name: "Add Tags to Session"
+    description: >-
+      Annotate a captured session with one or more tags. Use tags to mark
+      sessions as part of an ongoing investigation, confirmed incident, false
+      positive, or compliance audit finding.
+    use_cases:
+      - soc
+      - incident_response
+      - compliance
+    parameters:
+      - name: tags
+        type: string
+        required: true
+        description: Comma-separated list of tags to add, e.g. 'malware,c2,ioc-2024-001'.
+      - name: node
+        type: string
+        required: true
+        description: Arkime capture node name.
+      - name: session_id
+        type: string
+        required: true
+        description: Session ID to tag.
+      - name: segments
+        type: string
+        required: false
+        default: "all"
+        description: Which segments to tag ('all', 'src', 'dst').
+        enum: [all, src, dst]
+    output:
+      type: object
+      description: Result of the tag operation.
+
+  - name: remove_tags
+    display_name: "Remove Tags from Session"
+    description: >-
+      Remove one or more tags previously applied to a captured session.
+    use_cases:
+      - soc
+      - incident_response
+    parameters:
+      - name: tags
+        type: string
+        required: true
+        description: Comma-separated list of tags to remove.
+      - name: node
+        type: string
+        required: true
+        description: Arkime capture node name.
+      - name: session_id
+        type: string
+        required: true
+        description: Session ID.
+      - name: segments
+        type: string
+        required: false
+        default: "all"
+        description: Which segments to remove tags from ('all', 'src', 'dst').
+        enum: [all, src, dst]
+    output:
+      type: object
+      description: Result of the tag removal operation.
+
+  # ── Hunt (Packet-Payload Search) ──────────────────────────────────────────
+
+  - name: create_hunt
+    display_name: "Create Packet Hunt Job"
+    description: >-
+      Create a hunt job that searches raw packet payloads for a specific
+      string or regular expression. Useful for finding sessions that contain
+      known malware strings, credentials, file signatures, or command-and-
+      control beacons.
+    use_cases:
+      - threat_hunting
+      - incident_response
+      - soc
+    parameters:
+      - name: name
+        type: string
+        required: true
+        description: Human-readable name for this hunt job.
+      - name: search
+        type: string
+        required: true
+        description: >-
+          String or regular expression to search for in packet payloads,
+          e.g. 'password=', 'MZ\x90\x00', 'cmd.exe /c'.
+      - name: hunt_type
+        type: string
+        required: false
+        default: "raw"
+        description: Whether to search raw bytes, reassembled streams, or both.
+        enum: [raw, reassembled, both]
+      - name: src
+        type: boolean
+        required: false
+        default: true
+        description: Search source-direction packets.
+      - name: dst
+        type: boolean
+        required: false
+        default: true
+        description: Search destination-direction packets.
+    output:
+      type: object
+      description: Hunt job creation result including job ID.
+
+  - name: get_hunts
+    display_name: "List Hunt Jobs"
+    description: >-
+      List all existing packet hunt jobs, including their status (running,
+      completed, failed) and match counts.
+    use_cases:
+      - threat_hunting
+      - soc
+    parameters: []
+    output:
+      type: object
+      description: List of hunt jobs with status and results.
+
+  - name: delete_hunt
+    display_name: "Delete Hunt Job"
+    description: >-
+      Delete a packet hunt job by its ID.
+    use_cases:
+      - threat_hunting
+      - soc
+    parameters:
+      - name: hunt_id
+        type: string
+        required: true
+        description: Hunt job ID to delete.
+    output:
+      type: object
+      description: Result of the delete operation.
+
+  # ── Views (Saved Searches) ────────────────────────────────────────────────
+
+  - name: create_view
+    display_name: "Create Saved View"
+    description: >-
+      Save a named Arkime search expression as a reusable view. Useful for
+      persisting commonly used investigation queries so they can be recalled
+      without re-typing the expression.
+    use_cases:
+      - soc
+      - compliance
+      - threat_hunting
+    parameters:
+      - name: name
+        type: string
+        required: true
+        description: View name, e.g. 'external-HTTPS', 'known-malware-hashes'.
+      - name: expression
+        type: string
+        required: true
+        description: Arkime search expression to save.
+    output:
+      type: object
+      description: View creation result including view ID.
+
+  - name: get_views
+    display_name: "List Saved Views"
+    description: >-
+      Retrieve all saved Arkime search views.
+    use_cases:
+      - soc
+      - compliance
+    parameters: []
+    output:
+      type: object
+      description: List of saved views with names and expressions.
+
+  - name: delete_view
+    display_name: "Delete Saved View"
+    description: >-
+      Delete a saved Arkime view by its ID.
+    use_cases:
+      - soc
+    parameters:
+      - name: view_id
+        type: string
+        required: true
+        description: View ID to delete.
+    output:
+      type: object
+      description: Result of the delete operation.
+
+  # ── Notifiers ─────────────────────────────────────────────────────────────
+
+  - name: get_notifiers
+    display_name: "List Configured Notifiers"
+    description: >-
+      List all notifiers configured in Arkime, such as Slack webhooks,
+      email senders, or PagerDuty integrations.
+    use_cases:
+      - soc
+      - network_monitoring
+    parameters: []
+    output:
+      type: object
+      description: List of configured notifiers.
+
+  # ── Parliament (Multi-cluster) ────────────────────────────────────────────
+
+  - name: get_parliament
+    display_name: "Parliament Multi-Cluster Status"
+    description: >-
+      Retrieve status information for all Arkime clusters registered in
+      Parliament. Useful for monitoring distributed, multi-site deployments
+      from a single pane of glass.
+    use_cases:
+      - multi_cluster
+      - network_monitoring
+      - soc
+    parameters: []
+    output:
+      type: object
+      description: Parliament configuration and per-cluster health status.

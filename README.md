@@ -232,6 +232,35 @@ This project has been refactored from TypeScript to Python 3. Key changes:
 - **Tool Management**: New feature to enable/disable tools via configuration
 - **API Coverage**: Extended from 12 tools to 30+ tools covering all major Arkime APIs
 
+## Skills (agentskills.io)
+
+In addition to MCP, Arkime tools are exposed as **agentskills.io**-compatible skills so they can be used on any mainstream AI agent platform (Claude, GPT-4, Gemini, LangChain, AutoGen, CrewAI, Dify, Coze, etc.).
+
+The skills manifest is at [`skills/arkime_skills.yaml`](skills/arkime_skills.yaml).  
+Design rationale, brainstorming, and a full implementation plan are in [`skills/README.md`](skills/README.md).
+
+**Application directions covered by the skills:**
+
+| Scenario | Key Skills |
+|----------|-----------|
+| SOC Automation | `search_sessions`, `add_tags`, `geo_summary` |
+| Threat Hunting | `dns_lookups`, `connections_graph`, `create_hunt`, `external_connections` |
+| Incident Response | `get_session_detail`, `unique_destinations`, `get_session_packets` |
+| Network Monitoring | `top_talkers`, `capture_status`, `get_stats` |
+| Compliance & Audit | `external_connections`, `pcap_files`, `get_current_user` |
+| Multi-cluster Ops | `get_parliament`, `capture_status` |
+
+**Quick start — load skills in Python:**
+
+```python
+import yaml
+
+with open("skills/arkime_skills.yaml") as f:
+    manifest = yaml.safe_load(f)
+
+skills = manifest["skills"]  # list of 30 skill definitions
+```
+
 ## License
 
 MIT
