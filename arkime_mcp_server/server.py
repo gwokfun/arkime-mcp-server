@@ -6,8 +6,7 @@ Provides MCP tools for Arkime full packet capture system.
 
 import sys
 import json
-from datetime import datetime
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional
 from fastmcp import FastMCP
 
 from .client import ArkimeClient, MAX_SESSION_LIMIT
@@ -47,20 +46,6 @@ def get_mcp():
     if _mcp is None:
         _mcp = FastMCP("arkime")
     return _mcp
-
-
-# ── Helper function for tool registration ──
-
-
-def tool_enabled(tool_name: str):
-    """Decorator to conditionally register tools based on configuration."""
-
-    def decorator(func):
-        if get_config().is_tool_enabled(tool_name):
-            return func
-        return None
-
-    return decorator
 
 
 # ── Session Search & Analysis Tools ──
@@ -572,7 +557,7 @@ def add_tags(tags: str, node: str, session_id: str, segments: str = "all") -> st
     if not get_config().is_tool_enabled("add_tags"):
         return json.dumps({"error": "Tool is disabled"})
 
-    result = client.add_tags(tags, node, session_id, segments)
+    result = get_client().add_tags(tags, node, session_id, segments)
     return json.dumps(result, indent=2)
 
 
@@ -593,7 +578,7 @@ def remove_tags(tags: str, node: str, session_id: str, segments: str = "all") ->
     if not get_config().is_tool_enabled("remove_tags"):
         return json.dumps({"error": "Tool is disabled"})
 
-    result = client.remove_tags(tags, node, session_id, segments)
+    result = get_client().remove_tags(tags, node, session_id, segments)
     return json.dumps(result, indent=2)
 
 
@@ -657,7 +642,7 @@ def create_hunt(
     if not get_config().is_tool_enabled("create_hunt"):
         return json.dumps({"error": "Tool is disabled"})
 
-    result = client.create_hunt(name, search, hunt_type, src, dst)
+    result = get_client().create_hunt(name, search, hunt_type, src, dst)
     return json.dumps(result, indent=2)
 
 
@@ -690,7 +675,7 @@ def delete_hunt(hunt_id: str) -> str:
     if not get_config().is_tool_enabled("delete_hunt"):
         return json.dumps({"error": "Tool is disabled"})
 
-    result = client.delete_hunt(hunt_id)
+    result = get_client().delete_hunt(hunt_id)
     return json.dumps(result, indent=2)
 
 
@@ -712,7 +697,7 @@ def create_view(name: str, expression: str) -> str:
     if not get_config().is_tool_enabled("create_view"):
         return json.dumps({"error": "Tool is disabled"})
 
-    result = client.create_view(name, expression)
+    result = get_client().create_view(name, expression)
     return json.dumps(result, indent=2)
 
 
@@ -745,7 +730,7 @@ def delete_view(view_id: str) -> str:
     if not get_config().is_tool_enabled("delete_view"):
         return json.dumps({"error": "Tool is disabled"})
 
-    result = client.delete_view(view_id)
+    result = get_client().delete_view(view_id)
     return json.dumps(result, indent=2)
 
 

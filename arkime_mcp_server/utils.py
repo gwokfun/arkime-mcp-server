@@ -2,7 +2,7 @@
 Utility functions for Arkime MCP Server.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 
@@ -18,7 +18,7 @@ def format_timestamp(epoch_ms: Optional[int]) -> str:
     """
     if not epoch_ms:
         return "—"
-    dt = datetime.fromtimestamp(epoch_ms / 1000.0)
+    dt = datetime.fromtimestamp(epoch_ms / 1000.0, tz=timezone.utc)
     return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
