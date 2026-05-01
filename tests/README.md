@@ -9,7 +9,10 @@ tests/
 ├── __init__.py           # Test package initialization
 ├── test_utils.py         # Tests for utility functions
 ├── test_config.py        # Tests for configuration management
-└── test_client.py        # Tests for Arkime API client
+├── test_client.py        # Tests for Arkime API client
+├── test_e2e.py           # End-to-end tests for MCP server tools
+├── README.md             # This file - testing overview
+└── E2E_TESTS.md          # Detailed E2E testing documentation
 ```
 
 ## Running Tests
@@ -90,6 +93,14 @@ Test individual functions and classes in isolation:
 - **test_utils.py**: Tests for formatting functions (bytes, timestamps, protocols)
 - **test_config.py**: Tests for configuration loading from env vars and YAML
 - **test_client.py**: Tests for HTTP client and API methods (with mocking)
+
+### End-to-End Tests
+
+Test complete MCP server tool functionality with all integrations:
+
+- **test_e2e.py**: Tests for all 30+ MCP tools with mocked Arkime backend
+
+See [E2E_TESTS.md](E2E_TESTS.md) for detailed end-to-end testing documentation.
 
 ### Integration Tests
 
@@ -236,8 +247,8 @@ pip install pytest-cov
 
 As of the latest run:
 
-- **Total Tests**: 46
-- **Passing**: 46 (100%)
+- **Total Tests**: 85 (52 unit tests + 33 E2E tests)
+- **Passing**: 85 (100%)
 - **Failing**: 0
-- **Average Runtime**: ~1.3 seconds
+- **Average Runtime**: ~2.5 seconds
 - **Overall Coverage**: 57%
